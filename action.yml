@@ -1,0 +1,65 @@
+name: 'Get Version'
+description: >
+  Extracts and parses the latest Git tag according to Semantic Versioning (SemVer),
+  optionally incrementing the patch version based on the number of commits since the tag.
+  Provides detailed components such as major, minor, patch, prerelease, and build metadata.
+
+inputs:
+  disableAutoPatchCount:
+    description: >
+      If set to "true", disables automatic patch version bumping based on commit count
+      since the most recent Git tag. When disabled, the patch number from the tag is used
+      as-is without any increment. Defaults to "false".
+    required: false
+    default: 'false'
+
+outputs:
+  version:
+    description: >
+      The latest Git tag matching the pattern "v<semver>", e.g., "v1.2.7".
+      Falls back to "v0.0.0" if no valid tag is found.
+
+  versionWithoutV:
+    description: >
+      The version string with the "v" prefix removed, e.g., "1.2.7".
+      The actual formatting depends on parsing logic and may include prerelease or build info.
+
+  isSemver:
+    description: >
+      "true" if a valid SemVer tag was found and parsed successfully; otherwise "false".
+
+  major:
+    description: >
+      The major version component, e.g., "1" in "v1.2.3-alpha.0+build.1".
+      Empty if no valid SemVer tag is found.
+
+  minor:
+    description: >
+      The minor version component, e.g., "2" in "v1.2.3-alpha.0+build.1".
+      Empty if no valid SemVer tag is found.
+
+  patch:
+    description: >
+      The patch version component, potentially incremented by commit count if
+      auto patch bumping is enabled (default). For example, "3" if from tag "v1.2.3",
+      or "5" if 2 commits have occurred since then.
+      Empty if no valid SemVer tag is found.
+
+  prerelease:
+    description: >
+      The prerelease identifier component, e.g., "alpha.0" in "v1.2.3-alpha.0+build.1".
+      Empty if not present in the tag.
+
+  build:
+    description: >
+      The build metadata component, e.g., "build.1" in "v1.2.3-alpha.0+build.1".
+      Empty if not present in the tag.
+
+  isPrerelease:
+    description: >
+      "true" if the version includes a prerelease component (e.g., "alpha", "beta"),
+      otherwise "false".
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
