@@ -1,0 +1,50 @@
+name: 'Get Version'
+description: >
+  Extracts and parses the latest Git tag according to Semantic Versioning (SemVer),
+  with optional patch bumping based on commit count since the latest tag.
+
+inputs:
+  disableAutoPatchCount:
+    description: >
+      If set to "true", disables automatic patch version incrementing based on the number
+      of commits since the most recent Git tag. When disabled, the exact patch value from
+      the tag will be used as-is.
+    required: false
+    default: 'false'
+
+outputs:
+  version:
+    description: >
+      The latest Git tag matching the pattern "v<semver>", e.g., "v1.2.7".
+      Falls back to "v0.0.0" if no valid tag is found.
+  version-without-prefix:
+    description: >
+      The version string with the "v" prefix removed, e.g., "1.2.7".
+  is-semver:
+    description: >
+      "true" if the tag is a valid SemVer version, otherwise "false".
+  major:
+    description: >
+      The major component of the version, e.g., "1" in "v1.2.3-alpha.0+build.1".
+  minor:
+    description: >
+      The minor component of the version, e.g., "2" in "v1.2.3-alpha.0+build.1".
+  patch:
+    description: >
+      The patch component of the version, optionally increased by the number of commits
+      since the last tag, e.g., "3" or "5" if there were 2 new commits after "v1.2.3".
+  prerelease:
+    description: >
+      The prerelease identifier if present, e.g., "alpha.0" in "v1.2.3-alpha.0+build.1".
+      Empty if not present.
+  build:
+    description: >
+      The build metadata if present, e.g., "build.1" in "v1.2.3-alpha.0+build.1".
+      Empty if not present.
+  is-prerelease:
+    description: >
+      "true" if the version includes a prerelease component, otherwise "false".
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

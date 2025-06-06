@@ -1,0 +1,36 @@
+{
+  "name": "get-version-action",
+  "version": "1.0.0",
+  "description": "A GitHub Action which extracts the version from github.ref.",
+  "main": "src/index.js",
+  "scripts": {
+    "lint": "standard src/**/*.js test/**/*.js",
+    "lint:fix": "standard --fix src/**/*.js test/**/*.js",
+    "package": "ncc build src/index.js -o dist",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:version": "node ./src/index.js",
+    "updateAll": "npx npm-check -u"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/easylife365/get-version-action.git"
+  },
+  "author": "EasyLife 365 AG",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/easylife365/get-version-action/issues"
+  },
+  "homepage": "https://github.com/easylife365/get-version-action#readme",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1",
+    "child_process": "^1.0.2",
+    "semver": "^7.7.2"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.3",
+    "jest": "^29.7.0",
+    "standard": "^17.1.2"
+  }
+}
