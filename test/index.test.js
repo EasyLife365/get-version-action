@@ -1,38 +1,38 @@
 /* eslint-env jest */
 
-const core = require('@actions/core');
-const main = require('../src/index');
-const { extractLatestVersionFromGitTag } = require('../src/extractLatestVersionFromGitTag');
+const core = require('@actions/core')
+const main = require('../src/index')
+const { extractLatestVersionFromGitTag } = require('../src/extractLatestVersionFromGitTag')
 
-jest.mock('@actions/core');
-jest.mock('../src/extractLatestVersionFromGitTag');
+jest.mock('@actions/core')
+jest.mock('../src/extractLatestVersionFromGitTag')
 
 describe('get-version main execution', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-  });
+    jest.clearAllMocks()
+  })
 
   const getSetOutputs = () => {
     return core.setOutput.mock.calls.reduce((acc, [key, value]) => {
-      acc[key] = value;
-      return acc;
-    }, {});
-  };
+      acc[key] = value
+      return acc
+    }, {})
+  }
 
   test('should set default outputs even for incomplete semver version', () => {
     extractLatestVersionFromGitTag.mockReturnValue({
       version: 'v1.0',
       versionWithoutV: '1.0'
-    });
+    })
 
-    main();
+    main()
 
-    const outputs = getSetOutputs();
-    expect(outputs.version).toBe('v1.0');
-    expect(outputs.versionWithoutV).toBe('1.0');
-    expect(outputs.isSemver).toBe('false');
-    console.log('Outputs (incomplete version):', outputs);
-  });
+    const outputs = getSetOutputs()
+    expect(outputs.version).toBe('v1.0')
+    expect(outputs.versionWithoutV).toBe('1.0')
+    expect(outputs.isSemver).toBe('false')
+    console.log('Outputs (incomplete version):', outputs)
+  })
 
   test('should set all outputs correctly for a full semver version', () => {
     extractLatestVersionFromGitTag.mockReturnValue({
@@ -44,22 +44,22 @@ describe('get-version main execution', () => {
       prerelease: 'ALPHA.0',
       build: '456.7',
       isPrerelease: true
-    });
+    })
 
-    main();
+    main()
 
-    const outputs = getSetOutputs();
-    expect(outputs.version).toBe('v1.2.3-ALPHA.0+456.7');
-    expect(outputs.versionWithoutV).toBe('1.2.3-ALPHA.0+456.7');
-    expect(outputs.major).toBe('1');
-    expect(outputs.minor).toBe('2');
-    expect(outputs.patch).toBe('3');
-    expect(outputs.prerelease).toBe('ALPHA.0');
-    expect(outputs.build).toBe('456.7');
-    expect(outputs.isPrerelease).toBe(true);
-    expect(outputs.isSemver).toBe('true');
-    console.log('Outputs (full semver):', outputs);
-  });
+    const outputs = getSetOutputs()
+    expect(outputs.version).toBe('v1.2.3-ALPHA.0+456.7')
+    expect(outputs.versionWithoutV).toBe('1.2.3-ALPHA.0+456.7')
+    expect(outputs.major).toBe('1')
+    expect(outputs.minor).toBe('2')
+    expect(outputs.patch).toBe('3')
+    expect(outputs.prerelease).toBe('ALPHA.0')
+    expect(outputs.build).toBe('456.7')
+    expect(outputs.isPrerelease).toBe(true)
+    expect(outputs.isSemver).toBe('true')
+    console.log('Outputs (full semver):', outputs)
+  })
 
   test('should handle patch missing gracefully', () => {
     extractLatestVersionFromGitTag.mockReturnValue({
@@ -72,16 +72,16 @@ describe('get-version main execution', () => {
       build: '',
       isPrerelease: false,
       isSemver: 'true'
-    });
+    })
 
-    main();
+    main()
 
-    const outputs = getSetOutputs();
-    expect(outputs.version).toBe('v2.1');
-    expect(outputs.patch).toBe('');
-    expect(outputs.isSemver).toBe('true');
-    console.log('Outputs (missing patch):', outputs);
-  });
+    const outputs = getSetOutputs()
+    expect(outputs.version).toBe('v2.1')
+    expect(outputs.patch).toBe('')
+    expect(outputs.isSemver).toBe('true')
+    console.log('Outputs (missing patch):', outputs)
+  })
 
   test('should handle version with no prerelease/build', () => {
     extractLatestVersionFromGitTag.mockReturnValue({
@@ -93,18 +93,18 @@ describe('get-version main execution', () => {
       prerelease: '',
       build: '',
       isPrerelease: false
-    });
+    })
 
-    main();
+    main()
 
-    const outputs = getSetOutputs();
-    expect(outputs.version).toBe('v3.4.5');
-    expect(outputs.prerelease).toBe('');
-    expect(outputs.build).toBe('');
-    expect(outputs.isPrerelease).toBe(false);
-    expect(outputs.isSemver).toBe('true');
-    console.log('Outputs (no prerelease/build):', outputs);
-  });
+    const outputs = getSetOutputs()
+    expect(outputs.version).toBe('v3.4.5')
+    expect(outputs.prerelease).toBe('')
+    expect(outputs.build).toBe('')
+    expect(outputs.isPrerelease).toBe(false)
+    expect(outputs.isSemver).toBe('true')
+    console.log('Outputs (no prerelease/build):', outputs)
+  })
 
   test('should handle minimal version object', () => {
     extractLatestVersionFromGitTag.mockReturnValue({
@@ -117,28 +117,28 @@ describe('get-version main execution', () => {
       build: '',
       isPrerelease: false,
       isSemver: 'true'
-    });
+    })
 
-    main();
+    main()
 
-    const outputs = getSetOutputs();
-    expect(outputs.version).toBe('v0.0.1');
-    expect(outputs.versionWithoutV).toBe('0.0.1');
-    expect(outputs.major).toBe('0');
-    expect(outputs.minor).toBe('0');
-    expect(outputs.patch).toBe('1');
-    expect(outputs.isSemver).toBe('true');
-    console.log('Outputs (minimal):', outputs);
-  });
+    const outputs = getSetOutputs()
+    expect(outputs.version).toBe('v0.0.1')
+    expect(outputs.versionWithoutV).toBe('0.0.1')
+    expect(outputs.major).toBe('0')
+    expect(outputs.minor).toBe('0')
+    expect(outputs.patch).toBe('1')
+    expect(outputs.isSemver).toBe('true')
+    console.log('Outputs (minimal):', outputs)
+  })
 
   test('should fail the action if an exception is thrown', () => {
-    const error = new Error('Git failure');
+    const error = new Error('Git failure')
     extractLatestVersionFromGitTag.mockImplementation(() => {
-      throw error;
-    });
+      throw error
+    })
 
-    main();
+    main()
 
-    expect(core.setFailed).toHaveBeenCalledWith('Failed to extract version: Git failure');
-  });
-});
+    expect(core.setFailed).toHaveBeenCalledWith('Failed to extract version: Git failure')
+  })
+})

@@ -1,51 +1,49 @@
-const { execSync } = require('child_process');
-const core = require('@actions/core');
-const semver = require('semver');
+const { execSync } = require('child_process')
+const core = require('@actions/core')
+const semver = require('semver')
 
-const PRERELEASE_SEPARATOR = '.';
-const BUILD_SEPARATOR = '.';
-const DEFAULT_VERSION = 'v0.0.0';
+const PRERELEASE_SEPARATOR = '.'
+const BUILD_SEPARATOR = '.'
+const DEFAULT_VERSION = 'v0.0.1'
 
-function extractLatestVersionFromGitTag(options = {}) {
-  const prefix = options.prefix || 'v';
-  let version = DEFAULT_VERSION;
-  let commitsSinceTag = 0;
+function extractLatestVersionFromGitTag (options = {}) {
+  const prefix = options.prefix || 'v'
+  let version = DEFAULT_VERSION
+  let hasValidTag = false
+  let commitsSinceTag = 0
 
   try {
-    const tags = getTags(prefix);
+    const tags = getTags(prefix)
     if (tags.length > 0) {
-      version = tags[0];
-      core.info(`Found latest tag: ${version}`);
+      version = tags[0]
+      hasValidTag = true
+      core.info(`Found latest tag: ${version}`)
     } else {
-      core.warning(`No valid semver tags found with prefix "${prefix}", falling back to ${DEFAULT_VERSION}`);
+      core.warning(`No valid semver tags found with prefix "${prefix}", falling back to ${DEFAULT_VERSION}`)
     }
 
     if (!options.disableAutoPatchCount) {
-      commitsSinceTag = countCommitsSince(version);
-      core.info(`Commits since tag ${version}: ${commitsSinceTag}`);
+      commitsSinceTag = countCommitsSince(version, hasValidTag)
+      core.info(`Commits since tag ${version}: ${commitsSinceTag}`)
     }
   } catch (err) {
-    core.error(`Error extracting version: ${err.message}`);
+    core.error(`Error extracting version: ${err.message}`)
   }
 
   const versionWithoutPrefix = version.startsWith(prefix)
     ? version.slice(prefix.length)
-    : version;
+    : version
 
-  const parsed = parseVersionParts(versionWithoutPrefix);
-
-  if (version === DEFAULT_VERSION && parsed.patch === undefined) {
-    parsed.patch = '0';
-  }
+  const parsed = parseVersionParts(versionWithoutPrefix)
 
   if (!options.disableAutoPatchCount && parsed && !isNaN(Number(parsed.patch))) {
-    parsed.patch = (Number(parsed.patch) + commitsSinceTag).toString();
+    parsed.patch = (Number(parsed.patch) + commitsSinceTag).toString()
   }
 
   const recomposedVersion =
     `${prefix}${parsed.major}.${parsed.minor}.${parsed.patch}` +
     (parsed.prerelease ? `-${parsed.prerelease}` : '') +
-    (parsed.build ? `+${parsed.build}` : '');
+    (parsed.build ? `+${parsed.build}` : '')
 
   return {
     version: recomposedVersion,
@@ -57,14 +55,14 @@ function extractLatestVersionFromGitTag(options = {}) {
     build: parsed.build ?? '',
     isPrerelease: parsed.isPrerelease ? 'true' : 'false',
     isSemver: '' // placeholder, will be computed in `main`
-  };
+  }
 }
 
-function getTags(prefix = 'v') {
+function getTags (prefix = 'v') {
   try {
-    const rawTags = execSync(`git tag --list ${prefix}* --sort=-v:refname`, {
+    const rawTags = execSync(`git tag --merged HEAD --list "${prefix}*" --sort=-v:refname`, {
       encoding: 'utf-8'
-    }).trim();
+    }).trim()
 
     return rawTags
       .split(/\r?\n/)
@@ -72,28 +70,28 @@ function getTags(prefix = 'v') {
       .map(tag => ({ tag, semver: semver.valid(tag) || semver.coerce(tag) }))
       .filter(({ semver }) => semver !== null)
       .sort((a, b) => semver.rcompare(a.semver, b.semver))
-      .map(({ tag }) => tag);
+      .map(({ tag }) => tag)
   } catch (err) {
-    core.error(`Failed to retrieve git tags: ${err.message}`);
-    return [];
+    core.error(`Failed to retrieve git tags: ${err.message}`)
+    return []
   }
 }
 
-function countCommitsSince(tag) {
+function countCommitsSince (tag, hasValidTag) {
   try {
-    const command = tag === DEFAULT_VERSION
+    const command = !hasValidTag
       ? 'git rev-list --count HEAD'
-      : `git rev-list --count ${tag}..HEAD`;
+      : `git rev-list --count ${tag}..HEAD`
 
-    return parseInt(execSync(command, { encoding: 'utf-8' }).trim(), 10) || 0;
+    return parseInt(execSync(command, { encoding: 'utf-8' }).trim(), 10) || 0
   } catch (err) {
-    core.warning(`Failed to count commits since tag "${tag}": ${err.message}`);
-    return 0;
+    core.warning(`Failed to count commits since tag "${tag}": ${err.message}`)
+    return 0
   }
 }
 
-function parseVersionParts(version) {
-  const sv = semver.parse(version);
+function parseVersionParts (version) {
+  const sv = semver.parse(version)
   if (!sv) {
     return {
       major: '',
@@ -102,7 +100,7 @@ function parseVersionParts(version) {
       prerelease: '',
       build: '',
       isPrerelease: false
-    };
+    }
   }
 
   const result = {
@@ -112,20 +110,20 @@ function parseVersionParts(version) {
     prerelease: '',
     build: '',
     isPrerelease: false
-  };
+  }
 
   if (sv.prerelease.length > 0) {
-    result.prerelease = sv.prerelease.join(PRERELEASE_SEPARATOR);
-    result.isPrerelease = true;
+    result.prerelease = sv.prerelease.join(PRERELEASE_SEPARATOR)
+    result.isPrerelease = true
   }
 
   if (sv.build.length > 0) {
-    result.build = sv.build.join(BUILD_SEPARATOR);
+    result.build = sv.build.join(BUILD_SEPARATOR)
   }
 
-  return result;
+  return result
 }
 
 module.exports = {
   extractLatestVersionFromGitTag
-};
+}
