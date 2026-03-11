@@ -1,15 +1,17 @@
 ## 📦 Get Version Action
 
-A GitHub Action that extracts and parses the **latest Git tag** using [Semantic Versioning (SemVer)](https://semver.org/), with optional automatic patch bumping based on the number of commits since the last tag.
+A GitHub Action that extracts and parses the **latest Git tag reachable from the current branch** using [Semantic Versioning (SemVer)](https://semver.org/), with optional automatic patch bumping based on the number of commits since the last tag.
 
-This action queries real Git tags and sorts them semantically. It works consistently across push, release, and workflow\_dispatch triggers — regardless of the event type or branch layout.
+This action queries Git tags that are reachable from the current `HEAD` (branch-aware), sorts them semantically, and picks the highest version. It works consistently across push, release, and workflow\_dispatch triggers — respecting branch-specific tags and falling back to ancestor tags from `main` when no branch-specific tags exist.
+
+**✅ Compatible with:** npm, .NET, and any tool that uses Semantic Versioning
 
 ## 🚀 Outputs
 
 ### `version`
 
-The latest Git tag that matches a SemVer pattern, e.g. `v1.2.7`.
-If no valid tag is found, this defaults to `v0.0.0`.
+The latest Git tag reachable from `HEAD` that matches a SemVer pattern, e.g. `v1.2.7`.
+If no valid tag is found, this defaults to `v0.0.1`.
 
 ### `version-without-prefix`
 
@@ -49,6 +51,21 @@ Empty if not present.
 
 `true` if the version includes a prerelease segment. Otherwise `false`.
 
+## 🌿 Branch-Aware Version Resolution
+
+This action resolves the version **based on the current branch context**:
+
+1. **Branch-specific tags first**: Only tags reachable from the current `HEAD` are considered (`git tag --merged HEAD`). This means tags added to `main` after a feature branch was cut are correctly excluded.
+2. **Automatic fallback**: If no valid tags are reachable from `HEAD`, the version defaults to `v0.0.1`.
+
+**Example scenario:**
+
+| Situation | Tags visible | Selected version |
+|---|---|---|
+| On `main` with tag `v1.1.0` | `v1.1.0` | `v1.1.0` |
+| On feature branch (cut from `v1.1.0`) with tag `v1.2.0-feature.1` | `v1.2.0-feature.1`, `v1.1.0` | `v1.2.0-feature.1` |
+| Main advances to `v1.3.0` while still on feature branch | `v1.2.0-feature.1`, `v1.1.0` | `v1.2.0-feature.1` (correctly ignores `v1.3.0`) |
+
 ## ⚙️ Input Options
 
 ### `disableAutoPatchCount`
@@ -77,4 +94,75 @@ steps:
   - run: echo "Version: ${{ steps.get_version.outputs.version }}"
 
   - run: echo "Without prefix: ${{ steps.get_version.outputs.versionWithoutV }}"
+```
+
+## 🔄 npm and .NET Compatibility
+
+This action extracts version information in a format compatible with both **npm** and **.NET** ecosystems.
+
+### Version Format
+
+| Component | npm | .NET | Returned in version |
+|-----------|-----|------|---------------------|
+| `MAJOR.MINOR.PATCH` | ✅ Required | ✅ Required | ✅ YES |
+| Prerelease (`-alpha`, `-beta.1`) | ✅ Supported | ✅ Supported | ✅ YES |
+| Build metadata (`+build.456`) | ✅ Supported | ❌ **Not supported** | ❌ NO* |
+
+*Build metadata is parsed and returned in the `build` output field for reference, but **excluded from the `version` output** to ensure .NET compatibility.
+
+### Examples
+
+<table>
+<tr>
+<th>Git Tag</th>
+<th>version output</th>
+<th>build output</th>
+<th>npm</th>
+<th>.NET</th>
+</tr>
+<tr>
+<td><code>v1.2.3</code></td>
+<td><code>v1.2.3</code></td>
+<td><code>-</code></td>
+<td>✅ Works</td>
+<td>✅ Works</td>
+</tr>
+<tr>
+<td><code>v2.0.0-rc.1</code></td>
+<td><code>v2.0.0-rc.1</code></td>
+<td><code>-</code></td>
+<td>✅ Works</td>
+<td>✅ Works</td>
+</tr>
+<tr>
+<td><code>v1.0.0+build.123</code></td>
+<td><code>v1.0.0</code></td>
+<td><code>build.123</code></td>
+<td>✅ Compatible</td>
+<td>✅ Compatible</td>
+</tr>
+<tr>
+<td><code>v1.5.0-beta.2+metadata.789</code></td>
+<td><code>v1.5.0-beta.2</code></td>
+<td><code>metadata.789</code></td>
+<td>✅ Compatible</td>
+<td>✅ Compatible</td>
+</tr>
+</table>
+
+### Using with npm
+
+```bash
+npm version ${{ steps.get_version.outputs.versionWithoutV }}
+# Works with: 1.2.3, 2.0.0-rc.1, etc.
+```
+
+### Using with .NET
+
+```bash
+# Update AssemblyVersion (numbers only)
+dotnet build -p:AssemblyVersion=${{ steps.get_version.outputs.major }}.${{ steps.get_version.outputs.minor }}.${{ steps.get_version.outputs.patch }}
+
+# Update PackageVersion (supports prerelease)
+dotnet build -p:PackageVersion=${{ steps.get_version.outputs.versionWithoutV }}
 ```

@@ -1,0 +1,27 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Lint TypeScript files
+echo "🔍 Linting TypeScript files..."
+npm run lint
+
+if [ $? -ne 0 ]; then
+  echo "❌ Linting failed. Commit aborted."
+  exit 1
+fi
+
+# Build and package the distribution
+echo "🔨 Building and packaging distribution..."
+npm run build && npm run package
+
+if [ $? -ne 0 ]; then
+  echo "❌ Build failed. Commit aborted."
+  exit 1
+fi
+
+# Stage the updated dist folder
+echo "✅ Build successful. Adding dist/ to commit..."
+git add dist/
+
+echo "✅ All checks passed! Distribution is up-to-date!"
+exit 0
