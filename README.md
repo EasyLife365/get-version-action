@@ -166,3 +166,33 @@ dotnet build -p:AssemblyVersion=${{ steps.get_version.outputs.major }}.${{ steps
 # Update PackageVersion (supports prerelease)
 dotnet build -p:PackageVersion=${{ steps.get_version.outputs.versionWithoutV }}
 ```
+
+## 🛠️ Maintainer release runbook
+
+This repository includes two workflows to automate releases and keep the moving `v1` tag up to date.
+
+### 1) Publish a release manually
+
+Use **Actions → Release** and run the workflow with:
+
+- `version`: semantic version value like `1.1.2` or `v1.1.2`
+- `dry_run` (optional): `true` to validate inputs without creating a tag or release
+
+The workflow will:
+
+1. Normalize the version to `v<semver>`
+2. Validate semantic version format
+3. Fail if the tag already exists
+4. Create and push the release tag
+5. Publish a GitHub Release for that tag
+
+### 2) Automatic moving `v1` tag
+
+When a release is published, **Update v1 Tag** runs automatically:
+
+- If the release tag matches `v1.*`, it force-updates `v1` to the same commit
+- If the release tag is not in the `v1` line, the workflow logs a skip message and exits without changes
+
+### Tag protection note
+
+If your repository uses tag protection rules or rulesets, ensure GitHub Actions is allowed to update `v1` and create new `v1.*` tags. Otherwise the workflows will fail when pushing tags.
