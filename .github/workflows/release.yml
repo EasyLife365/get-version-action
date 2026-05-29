@@ -21,7 +21,74 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          path: action-src
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: action-src/package-lock.json
+
+      - name: Install dependencies
+        working-directory: action-src
+        run: npm ci
+
+      - name: Lint
+        working-directory: action-src
+        run: npm run lint -- --max-warnings 0
+
+      - name: Build
+        working-directory: action-src
+        run: npm run build
+
+      - name: Package action
+        working-directory: action-src
+        run: npm run package
+
+      - name: Unit tests
+        working-directory: action-src
+        run: npm run test
+
+      - name: Runtime smoke test
+        working-directory: action-src
+        run: npm run test:runtime-smoke
+
+      - name: Ensure dist/index.js is up-to-date
+        working-directory: action-src
+        run: |
+          git diff --quiet dist/index.js || (echo "❌ dist/index.js is out of date. Run npm run package and commit changes." && git status && exit 1)
+
+      - name: Prepare temporary test repository
+        run: |
+          git init
+          git config user.email integration@test.local
+          git config user.name Integration Test
+          echo "# Integration test repository" > README.md
+          git add README.md
+          git commit -m "test: initialize repository"
+          git tag v4.5.6
+
+      - name: Run local action
+        id: get_version
+        uses: ./action-src
+
+      - name: Verify expected outputs
+        run: |
+          test "${{ steps.get_version.outputs.version }}" = "v4.5.6"
+          test "${{ steps.get_version.outputs.versionWithoutV }}" = "4.5.6"
+          test "${{ steps.get_version.outputs.major }}" = "4"
+          test "${{ steps.get_version.outputs.minor }}" = "5"
+          test "${{ steps.get_version.outputs.patch }}" = "6"
+
   create-release:
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
