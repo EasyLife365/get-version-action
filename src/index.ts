@@ -27,9 +27,9 @@ const OUTPUTS: Record<keyof VersionOutputs, string> = {
 
 export default main
 
-export function main(options: Record<string, unknown> = {}): void {
+export async function main(options: Record<string, unknown> = {}): Promise<void> {
   try {
-    const result = extractLatestVersionFromGitTag(options)
+    const result = await extractLatestVersionFromGitTag(options)
     info(`Extracted version info: ${JSON.stringify(result, null, 2)}`)
 
     Object.keys(result).forEach((key) => {
@@ -47,6 +47,10 @@ export function main(options: Record<string, unknown> = {}): void {
   }
 }
 
-// Execute main when run by GitHub Actions (esbuild will include this in the bundle)
-// In test environment, this will be skipped
-main()
+// Execute main when run by GitHub Actions.
+if (process.env.JEST_WORKER_ID === undefined) {
+  main().catch((err) => {
+    const message = err instanceof Error ? err.message : String(err)
+    setFailed(`Failed to extract version: ${message}`)
+  })
+}
