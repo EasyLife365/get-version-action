@@ -195,23 +195,16 @@ describe('get-version main execution', () => {
   })
 
   test('should await async extraction before setting outputs', async () => {
-    ;(extractLatestVersionFromGitTag as jest.Mock).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({
-              version: 'v9.8.7',
-              versionWithoutV: '9.8.7',
-              major: '9',
-              minor: '8',
-              patch: '7',
-              prerelease: '',
-              build: '',
-              isPrerelease: false
-            })
-          }, 1)
-        })
-    )
+    ;(extractLatestVersionFromGitTag as jest.Mock).mockResolvedValue({
+      version: 'v9.8.7',
+      versionWithoutV: '9.8.7',
+      major: '9',
+      minor: '8',
+      patch: '7',
+      prerelease: '',
+      build: '',
+      isPrerelease: false
+    })
 
     await main()
 

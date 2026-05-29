@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -31,15 +34,15 @@ jobs:
       - name: Package action
         run: npm run package
 
+      - name: Ensure dist/index.js is up-to-date
+        run: |
+          git diff --quiet dist/index.js || (echo "❌ dist/index.js is out of date. Run npm run package and commit changes." && git status && exit 1)
+
       - name: Unit tests
         run: npm run test
 
       - name: Runtime smoke test
         run: npm run test:runtime-smoke
-
-      - name: Ensure dist/index.js is up-to-date
-        run: |
-          git diff --quiet dist/index.js || (echo "❌ dist/index.js is out of date. Run npm run package and commit changes." && git status && exit 1)
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3

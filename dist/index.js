@@ -21146,8 +21146,8 @@ async function main(options = {}) {
 }
 if (process.env.JEST_WORKER_ID === void 0) {
   main().catch((err) => {
-    error(`Unhandled execution error: ${err instanceof Error ? err.message : String(err)}`);
-    setFailed("Failed to extract version: Unhandled execution error");
+    const message = err instanceof Error ? err.message : String(err);
+    setFailed(`Failed to extract version: ${message}`);
   });
 }
 // Annotate the CommonJS export names for ESM import in node:

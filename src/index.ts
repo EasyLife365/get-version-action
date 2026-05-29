@@ -1,4 +1,4 @@
-import { info, setOutput, setFailed, error as coreError } from '@actions/core'
+import { info, setOutput, setFailed } from '@actions/core'
 import { extractLatestVersionFromGitTag } from './extractLatestVersionFromGitTag'
 
 interface VersionOutputs {
@@ -50,7 +50,7 @@ export async function main(options: Record<string, unknown> = {}): Promise<void>
 // Execute main when run by GitHub Actions.
 if (process.env.JEST_WORKER_ID === undefined) {
   main().catch((err) => {
-    coreError(`Unhandled execution error: ${err instanceof Error ? err.message : String(err)}`)
-    setFailed('Failed to extract version: Unhandled execution error')
+    const message = err instanceof Error ? err.message : String(err)
+    setFailed(`Failed to extract version: ${message}`)
   })
 }

@@ -52,6 +52,11 @@ jobs:
         working-directory: action-src
         run: npm run package
 
+      - name: Ensure dist/index.js is up-to-date
+        working-directory: action-src
+        run: |
+          git diff --quiet dist/index.js || (echo "❌ dist/index.js is out of date. Run npm run package and commit changes." && git status && exit 1)
+
       - name: Unit tests
         working-directory: action-src
         run: npm run test
@@ -59,11 +64,6 @@ jobs:
       - name: Runtime smoke test
         working-directory: action-src
         run: npm run test:runtime-smoke
-
-      - name: Ensure dist/index.js is up-to-date
-        working-directory: action-src
-        run: |
-          git diff --quiet dist/index.js || (echo "❌ dist/index.js is out of date. Run npm run package and commit changes." && git status && exit 1)
 
       - name: Prepare temporary test repository
         run: |

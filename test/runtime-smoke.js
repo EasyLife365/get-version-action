@@ -32,7 +32,7 @@ try {
   }
 
   const combinedOutput = `${execution.stdout}\n${execution.stderr}`
-  if (combinedOutput.includes('Dynamic require of "net" is not supported')) {
+  if (/(dynamic require .* not supported|ERR_REQUIRE_ESM|Cannot use import statement outside a module)/i.test(combinedOutput)) {
     throw new Error(`Regression detected in bundled runtime:\n${combinedOutput}`)
   }
 } finally {
