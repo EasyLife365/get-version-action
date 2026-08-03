@@ -32,12 +32,15 @@ export async function main(options: Record<string, unknown> = {}): Promise<void>
     const result = await extractLatestVersionFromGitTag(options)
     info(`Extracted version info: ${JSON.stringify(result, null, 2)}`)
 
-    Object.keys(result).forEach((key) => {
-      const outputKey = key as keyof VersionOutputs
-      setOutput(OUTPUTS[outputKey], result[outputKey] ?? '')
-    })
+    ;(Object.keys(OUTPUTS) as Array<keyof VersionOutputs>)
+      .filter((key) => key !== 'isSemver')
+      .forEach((key) => {
+        setOutput(OUTPUTS[key], result[key] ?? '')
+      })
 
-    setOutput('isSemver', Object.prototype.hasOwnProperty.call(result, 'major').toString())
+    const hasSemverCoreParts = [result.major, result.minor, result.patch]
+      .every(part => typeof part === 'string' && /^\d+$/.test(part))
+    setOutput(OUTPUTS.isSemver, hasSemverCoreParts.toString())
   } catch (error) {
     if (error instanceof Error) {
       setFailed(`Failed to extract version: ${error.message}`)

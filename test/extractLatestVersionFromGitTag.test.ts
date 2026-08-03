@@ -26,7 +26,7 @@ describe('extractLatestVersionFromGitTag', () => {
       prerelease: '',
       build: '',
       isPrerelease: 'false',
-      isSemver: ''
+      isSemver: 'true'
     })
   })
 

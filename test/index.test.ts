@@ -78,7 +78,7 @@ describe('get-version main execution', () => {
     const outputs = getSetOutputs()
     expect(outputs.version).toBe('v2.1')
     expect(outputs.patch).toBe('')
-    expect(outputs.isSemver).toBe('true')
+    expect(outputs.isSemver).toBe('false')
     console.log('Outputs (missing patch):', outputs)
   })
 
@@ -192,6 +192,7 @@ describe('get-version main execution', () => {
     expect(outputs.major).toBe('3')
     // verify isSemver is computed, not from the input
     expect(outputs.isSemver).toBe('true')
+    expect(core.setOutput).not.toHaveBeenCalledWith(undefined, expect.anything())
   })
 
   test('should await async extraction before setting outputs', async () => {

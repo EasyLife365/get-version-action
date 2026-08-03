@@ -69,6 +69,9 @@ export function extractLatestVersionFromGitTag(options: ExtractOptions = {}): Ve
     parsed.patch = (Number(parsed.patch) + commitsSinceTag).toString()
   }
 
+  const isSemver = [parsed.major, parsed.minor, parsed.patch]
+    .every(part => /^\d+$/.test(part))
+
   // Recompose version WITHOUT build metadata for .NET compatibility
   // npm supports build metadata (+xyz), but .NET does not
   // We strip the build metadata from the returned version to ensure both npm and .NET compatibility
@@ -85,7 +88,7 @@ export function extractLatestVersionFromGitTag(options: ExtractOptions = {}): Ve
     prerelease: parsed.prerelease ?? '',
     build: parsed.build ?? '', // kept for reference but not included in final version string
     isPrerelease: parsed.isPrerelease ? 'true' : 'false',
-    isSemver: '' // placeholder, will be computed in `main`
+    isSemver: isSemver ? 'true' : 'false'
   }
 }
 
