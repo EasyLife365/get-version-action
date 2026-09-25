@@ -34,9 +34,9 @@ jobs:
       - name: Package action
         run: npm run package
 
-      - name: Ensure dist/index.js is up-to-date
+      - name: Ensure bundled dist files are up-to-date
         run: |
-          git diff --quiet dist/index.js || (echo "❌ dist/index.js is out of date. Run npm run package and commit changes." && git status && exit 1)
+          git diff --quiet dist/index.js create-release/dist/index.js || (echo "❌ A bundled dist file is out of date. Run npm run package and commit changes." && git status && exit 1)
 
       - name: Unit tests
         run: npm run test

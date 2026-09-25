@@ -1,6 +1,19 @@
+# get-version-action
+
+Two independent GitHub Actions for SemVer-based versioning, callable from any repository. They
+don't depend on each other -- use either on its own, or both together (read the current version
+with `get-version`, then hand a bumped value to `create-release`).
+
+| Action | What it does | Talks to |
+|---|---|---|
+| [`get-version`](#-get-version-action) (this repo's root) | Reads the **existing** version at `HEAD` and parses it into components. Read-only, no token needed. | Local `git` only |
+| [`create-release`](#-create-release-action) (`create-release/`) | Takes a version **you supply**, validates it, and publishes it as a new tag + GitHub Release. Write-capable, needs a token. | GitHub REST API |
+
 ## 📦 Get Version Action
 
 A GitHub Action that extracts and parses the **latest Git tag reachable from the current branch** using [Semantic Versioning (SemVer)](https://semver.org/), with optional automatic patch bumping based on the number of commits since the last tag.
+
+**How it works:** it shells out to `git tag --merged HEAD --list "v*" --sort=-v:refname` to list every tag reachable from the current commit, keeps only the ones that parse as valid SemVer (via the `semver` package), and takes the highest one. If `disableAutoPatchCount` isn't set, it then counts commits between that tag and `HEAD` (`git rev-list --count <tag>..HEAD`) and adds that count onto the patch number -- so a branch three commits ahead of `v1.2.3` reports `v1.2.4` without anyone having tagged it. Everything happens locally against the checked-out repository; it never calls the GitHub API and needs no token, only `fetch-depth: 0` so the tag history is actually present to query.
 
 This action queries Git tags that are reachable from the current `HEAD` (branch-aware), sorts them semantically, and picks the highest version. It works consistently across push, release, and workflow\_dispatch triggers — respecting branch-specific tags and falling back to ancestor tags from `main` when no branch-specific tags exist.
 
@@ -167,32 +180,132 @@ dotnet build -p:AssemblyVersion=${{ steps.get_version.outputs.major }}.${{ steps
 dotnet build -p:PackageVersion=${{ steps.get_version.outputs.versionWithoutV }}
 ```
 
-## 🛠️ Maintainer release runbook
+## 🚢 Create Release Action
 
-This repository includes two workflows to automate releases and keep the moving `v1` tag up to date.
+A second action in this repository, for any repository that wants to cut its own tagged
+releases the same way this one does. Unlike `get-version`, it does not read the git history --
+it validates a version you supply, creates the tag and a GitHub Release for it via the GitHub
+API, and (unless the version is a prerelease) moves a floating major tag like `v1` to match. No
+checkout, no `fetch-depth: 0`, no `git push` -- one API-backed action instead of hand-rolled
+shell in every consuming repository's own release workflow.
 
-### 1) Publish a release manually
+**How it works**, in order, entirely through the GitHub REST API via `@actions/github`'s
+`getOctokit` -- nothing here touches the local git checkout at all:
 
-Use **Actions → Release** and run the workflow with:
+1. **Validate.** Strips a leading `v` if present and runs the rest through `semver.parse()` (the
+   same dependency `get-version` uses, not a hand-rolled regex). An invalid version fails the
+   action immediately, before anything is created.
+2. **Check for collision.** Calls `GET /repos/{owner}/{repo}/git/refs/tags/{tag}`. A 404 means
+   the tag is free; anything else (including success) fails the action rather than silently
+   overwriting an existing release.
+3. **Stop here on a dry run.** `dry-run: true` ends the action at this point -- steps 1 and 2
+   already prove the version is valid and available, without creating anything.
+4. **Create the tag**, pointing at the commit the workflow is running against (`POST
+   /repos/{owner}/{repo}/git/refs`, `ref: refs/tags/<tag>`).
+5. **Publish the GitHub Release** for that tag (`POST /repos/{owner}/{repo}/releases`), with
+   `generate_release_notes: true` so the release body is built from merged PR titles since the
+   last tag, and `prerelease` set from whether the version has a `-` suffix.
+6. **Move the floating major tag**, unless `update-major-tag: false` was set or the version is a
+   prerelease (checked in step 1). If `vMAJOR` already exists, it's force-updated
+   (`PATCH .../git/refs/tags/vMAJOR`) to the new commit; if this is the first release in that
+   major line, it's created fresh the same way as step 4.
 
-- `version`: semantic version value like `1.1.2` or `v1.1.2`
-- `dry_run` (optional): `true` to validate inputs without creating a tag or release
+Every one of these is a single, structured API call -- there's no shell string built from the
+version input anywhere, so the usual "caller-supplied text spliced into a `run:` script" class of
+risk doesn't apply here the way it would to a hand-rolled bash equivalent.
 
-The workflow will:
+### Inputs
 
-1. Normalize the version to `v<semver>`
-2. Validate semantic version format
-3. Fail if the tag already exists
-4. Create and push the release tag
-5. Publish a GitHub Release for that tag
+| Input | Default | Description |
+|---|---|---|
+| `version` | *(required)* | e.g. `1.2.3` or `v1.2.3`. Prerelease/build metadata suffixes accepted. |
+| `dry-run` | `false` | Validate only -- no tag or release will be created. |
+| `update-major-tag` | `true` | Also force-move the floating `vMAJOR` tag. Skipped automatically for a prerelease version, regardless of this input. |
+| `github-token` | `${{ github.token }}` | Needs `contents: write` on the target repository. |
 
-### 2) Automatic moving `v1` tag
+### Outputs
 
-When a release is published, **Update v1 Tag** runs automatically:
+| Output | Description |
+|---|---|
+| `tag` | The normalized release tag that was created, e.g. `v1.2.3`. |
+| `major-tag` | The floating major tag that was moved, e.g. `v1`. Empty if `update-major-tag` was false, the version is a prerelease, or `dry-run` was set. |
+| `created` | `"true"` if a tag/release was actually created; `"false"` on a dry run. |
 
-- If the release tag matches `v1.*`, it force-updates `v1` to the same commit
-- If the release tag is not in the `v1` line, the workflow logs a skip message and exits without changes
+### Example usage
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        type: string
+      dry_run:
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: easylife365/get-version-action/create-release@v1
+        with:
+          version: ${{ inputs.version }}
+          dry-run: ${{ inputs.dry_run }}
+```
 
 ### Tag protection note
 
-If your repository uses tag protection rules or rulesets, ensure GitHub Actions is allowed to update `v1` and create new `v1.*` tags. Otherwise the workflows will fail when pushing tags.
+If your repository uses tag protection rules or rulesets, ensure the identity behind
+`github-token` is allowed to create and force-update tags. Otherwise the action fails when it
+tries to write them.
+
+**`update-major-tag` defaults to `true`.** Every non-prerelease call force-moves the floating
+major tag by default -- that's the point of a floating tag, but it means this is a default-on
+destructive, history-rewriting operation, not just an available one. Grant `github-token` only
+`contents: write` on the target repository (the minimum this action needs), never a broader
+credential, and set `update-major-tag: false` explicitly for any caller that wants to publish a
+version without moving what every other consumer of the major tag receives.
+
+## 🛠️ Maintainer release runbook
+
+This repository releases itself using its own **Create Release** action (see above) -- one
+implementation, used both by this repo's own releases and by anything else that calls the action.
+
+### Exact steps to release a new version
+
+1. **Merge whatever you're releasing into `main` first.** The release workflow always tags
+   `main`'s current tip (`github.sha` at the time you run it) -- there is no way to release an
+   unmerged branch.
+2. **Decide the version number.** Check the existing tags (`git tag --list 'v*' --sort=-v:refname`,
+   or the repo's **Tags** page) to see the latest one, then bump by SemVer rules:
+   - **Patch** (`1.1.3` → `1.1.4`): a bug fix, no interface change.
+   - **Minor** (`1.1.3` → `1.2.0`): a new input/output added, backward compatible.
+   - **Major** (`1.1.3` → `2.0.0`): removes or renames an input/output, or changes what an
+     existing default does -- something an existing caller would break on.
+   `package.json`'s own `"version"` field is **not** the source of truth for this decision --
+   this repo is versioned by its git tags, not that field, so don't just copy it.
+3. **Go to the repo's Actions tab → Release workflow → Run workflow.**
+   - Branch: `main` (the default; leave it).
+   - `version`: the number you decided in step 2, with or without a leading `v` (e.g. `1.1.4`
+     or `v1.1.4` -- both normalize the same way).
+   - `dry_run`: leave `false` for a real release. Set it to `true` first if you want to validate
+     the version format and confirm the tag doesn't already exist without publishing anything.
+4. **Run it, then watch the run.** Two jobs: `validate` builds, lints, tests, and packages both
+   actions in this repository (`get-version` and `create-release`) and fails if the committed
+   `dist/` files are out of date; `create-release` then calls the freshly-built local
+   `create-release` action to tag `main`, publish a GitHub Release with auto-generated notes, and
+   -- unless the version is a prerelease -- force-move the floating `v1` tag to match, all in one
+   step.
+5. **Confirm it landed**: the new tag and Release appear on the repo's **Releases** page, and
+   (for a non-prerelease) `v1` now points at the same commit -- `git tag --points-at v1` should
+   list your new tag too.
+
+If step 4 fails at `validate`, nothing is tagged or published -- fix whatever failed (usually a
+stale `dist/` file: run `npm run package` locally, commit, and re-run) and try again from step 3.
+If it fails partway through `create-release` (e.g. the tag already existed), no partial release is
+left in a broken state per se, but check the **Releases** page before retrying with a different
+version number to be sure.
