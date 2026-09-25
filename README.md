@@ -237,11 +237,37 @@ version without moving what every other consumer of the major tag receives.
 This repository releases itself using its own **Create Release** action (see above) -- one
 implementation, used both by this repo's own releases and by anything else that calls the action.
 
-Use **Actions → Release** and run the workflow with:
+### Exact steps to release a new version
 
-- `version`: semantic version value like `1.1.2` or `v1.1.2`
-- `dry_run` (optional): `true` to validate inputs without creating a tag or release
+1. **Merge whatever you're releasing into `main` first.** The release workflow always tags
+   `main`'s current tip (`github.sha` at the time you run it) -- there is no way to release an
+   unmerged branch.
+2. **Decide the version number.** Check the existing tags (`git tag --list 'v*' --sort=-v:refname`,
+   or the repo's **Tags** page) to see the latest one, then bump by SemVer rules:
+   - **Patch** (`1.1.3` → `1.1.4`): a bug fix, no interface change.
+   - **Minor** (`1.1.3` → `1.2.0`): a new input/output added, backward compatible.
+   - **Major** (`1.1.3` → `2.0.0`): removes or renames an input/output, or changes what an
+     existing default does -- something an existing caller would break on.
+   `package.json`'s own `"version"` field is **not** the source of truth for this decision --
+   this repo is versioned by its git tags, not that field, so don't just copy it.
+3. **Go to the repo's Actions tab → Release workflow → Run workflow.**
+   - Branch: `main` (the default; leave it).
+   - `version`: the number you decided in step 2, with or without a leading `v` (e.g. `1.1.4`
+     or `v1.1.4` -- both normalize the same way).
+   - `dry_run`: leave `false` for a real release. Set it to `true` first if you want to validate
+     the version format and confirm the tag doesn't already exist without publishing anything.
+4. **Run it, then watch the run.** Two jobs: `validate` builds, lints, tests, and packages both
+   actions in this repository (`get-version` and `create-release`) and fails if the committed
+   `dist/` files are out of date; `create-release` then calls the freshly-built local
+   `create-release` action to tag `main`, publish a GitHub Release with auto-generated notes, and
+   -- unless the version is a prerelease -- force-move the floating `v1` tag to match, all in one
+   step.
+5. **Confirm it landed**: the new tag and Release appear on the repo's **Releases** page, and
+   (for a non-prerelease) `v1` now points at the same commit -- `git tag --points-at v1` should
+   list your new tag too.
 
-The `validate` job builds, lints, tests, and packages both actions in this repository first
-(`get-version` and `create-release`), then the `create-release` job calls the freshly-built
-local action to tag, release, and move `v1` in one step.
+If step 4 fails at `validate`, nothing is tagged or published -- fix whatever failed (usually a
+stale `dist/` file: run `npm run package` locally, commit, and re-run) and try again from step 3.
+If it fails partway through `create-release` (e.g. the tag already existed), no partial release is
+left in a broken state per se, but check the **Releases** page before retrying with a different
+version number to be sure.
