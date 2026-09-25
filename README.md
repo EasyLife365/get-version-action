@@ -167,32 +167,74 @@ dotnet build -p:AssemblyVersion=${{ steps.get_version.outputs.major }}.${{ steps
 dotnet build -p:PackageVersion=${{ steps.get_version.outputs.versionWithoutV }}
 ```
 
+## 🚢 Create Release Action
+
+A second action in this repository, for any repository that wants to cut its own tagged
+releases the same way this one does. Unlike `get-version`, it does not read the git history --
+it validates a version you supply, creates the tag and a GitHub Release for it via the GitHub
+API, and (unless the version is a prerelease) moves a floating major tag like `v1` to match. No
+checkout, no `fetch-depth: 0`, no `git push` -- one API-backed action instead of hand-rolled
+shell in every consuming repository's own release workflow.
+
+### Inputs
+
+| Input | Default | Description |
+|---|---|---|
+| `version` | *(required)* | e.g. `1.2.3` or `v1.2.3`. Prerelease/build metadata suffixes accepted. |
+| `dry-run` | `false` | Validate only -- no tag or release will be created. |
+| `update-major-tag` | `true` | Also force-move the floating `vMAJOR` tag. Skipped automatically for a prerelease version, regardless of this input. |
+| `github-token` | `${{ github.token }}` | Needs `contents: write` on the target repository. |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `tag` | The normalized release tag that was created, e.g. `v1.2.3`. |
+| `major-tag` | The floating major tag that was moved, e.g. `v1`. Empty if `update-major-tag` was false, the version is a prerelease, or `dry-run` was set. |
+| `created` | `"true"` if a tag/release was actually created; `"false"` on a dry run. |
+
+### Example usage
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        type: string
+      dry_run:
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: easylife365/get-version-action/create-release@v1
+        with:
+          version: ${{ inputs.version }}
+          dry-run: ${{ inputs.dry_run }}
+```
+
+### Tag protection note
+
+If your repository uses tag protection rules or rulesets, ensure the identity behind
+`github-token` is allowed to create and force-update tags. Otherwise the action fails when it
+tries to write them.
+
 ## 🛠️ Maintainer release runbook
 
-This repository includes two workflows to automate releases and keep the moving `v1` tag up to date.
-
-### 1) Publish a release manually
+This repository releases itself using its own **Create Release** action (see above) -- one
+implementation, used both by this repo's own releases and by anything else that calls the action.
 
 Use **Actions → Release** and run the workflow with:
 
 - `version`: semantic version value like `1.1.2` or `v1.1.2`
 - `dry_run` (optional): `true` to validate inputs without creating a tag or release
 
-The workflow will:
-
-1. Normalize the version to `v<semver>`
-2. Validate semantic version format
-3. Fail if the tag already exists
-4. Create and push the release tag
-5. Publish a GitHub Release for that tag
-
-### 2) Automatic moving `v1` tag
-
-When a release is published, **Update v1 Tag** runs automatically:
-
-- If the release tag matches `v1.*`, it force-updates `v1` to the same commit
-- If the release tag is not in the `v1` line, the workflow logs a skip message and exits without changes
-
-### Tag protection note
-
-If your repository uses tag protection rules or rulesets, ensure GitHub Actions is allowed to update `v1` and create new `v1.*` tags. Otherwise the workflows will fail when pushing tags.
+The `validate` job builds, lints, tests, and packages both actions in this repository first
+(`get-version` and `create-release`), then the `create-release` job calls the freshly-built
+local action to tag, release, and move `v1` in one step.

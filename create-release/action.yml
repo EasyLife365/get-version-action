@@ -1,0 +1,46 @@
+name: 'Create Release'
+description: >
+  Validates a semantic version, tags the target commit, and publishes a GitHub Release with
+  auto-generated notes -- optionally moving a floating major-version tag (v1, v2, ...) to match,
+  unless the version is a prerelease. Calls the GitHub REST API directly (no checkout needed) and
+  shares its version-parsing logic with the sibling get-version action, so both accept the exact
+  same SemVer format.
+
+inputs:
+  version:
+    description: 'Release version, e.g. "1.2.3" or "v1.2.3". Prerelease/build metadata suffixes are accepted.'
+    required: true
+
+  dry-run:
+    description: 'Validate only -- no tag or release will be created.'
+    required: false
+    default: 'false'
+
+  update-major-tag:
+    description: >
+      Also force-move the floating vMAJOR tag (e.g. "v1") to this release. Skipped automatically
+      when the version is a prerelease, regardless of this input, so a caller pinning the major
+      tag never silently receives unstable code.
+    required: false
+    default: 'true'
+
+  github-token:
+    description: 'Token used to create the tag and release. Needs contents: write on this repository.'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  tag:
+    description: 'The normalized release tag that was created, e.g. "v1.2.3".'
+
+  major-tag:
+    description: >
+      The floating major tag that was moved (e.g. "v1"). Empty if update-major-tag was false, or
+      the version is a prerelease, or dry-run was set.
+
+  created:
+    description: '"true" if a tag and release were actually created; "false" on a dry run.'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
