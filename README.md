@@ -1,6 +1,19 @@
+# get-version-action
+
+Two independent GitHub Actions for SemVer-based versioning, callable from any repository. They
+don't depend on each other -- use either on its own, or both together (read the current version
+with `get-version`, then hand a bumped value to `create-release`).
+
+| Action | What it does | Talks to |
+|---|---|---|
+| [`get-version`](#-get-version-action) (this repo's root) | Reads the **existing** version at `HEAD` and parses it into components. Read-only, no token needed. | Local `git` only |
+| [`create-release`](#-create-release-action) (`create-release/`) | Takes a version **you supply**, validates it, and publishes it as a new tag + GitHub Release. Write-capable, needs a token. | GitHub REST API |
+
 ## 📦 Get Version Action
 
 A GitHub Action that extracts and parses the **latest Git tag reachable from the current branch** using [Semantic Versioning (SemVer)](https://semver.org/), with optional automatic patch bumping based on the number of commits since the last tag.
+
+**How it works:** it shells out to `git tag --merged HEAD --list "v*" --sort=-v:refname` to list every tag reachable from the current commit, keeps only the ones that parse as valid SemVer (via the `semver` package), and takes the highest one. If `disableAutoPatchCount` isn't set, it then counts commits between that tag and `HEAD` (`git rev-list --count <tag>..HEAD`) and adds that count onto the patch number -- so a branch three commits ahead of `v1.2.3` reports `v1.2.4` without anyone having tagged it. Everything happens locally against the checked-out repository; it never calls the GitHub API and needs no token, only `fetch-depth: 0` so the tag history is actually present to query.
 
 This action queries Git tags that are reachable from the current `HEAD` (branch-aware), sorts them semantically, and picks the highest version. It works consistently across push, release, and workflow\_dispatch triggers — respecting branch-specific tags and falling back to ancestor tags from `main` when no branch-specific tags exist.
 
@@ -175,6 +188,31 @@ it validates a version you supply, creates the tag and a GitHub Release for it v
 API, and (unless the version is a prerelease) moves a floating major tag like `v1` to match. No
 checkout, no `fetch-depth: 0`, no `git push` -- one API-backed action instead of hand-rolled
 shell in every consuming repository's own release workflow.
+
+**How it works**, in order, entirely through the GitHub REST API via `@actions/github`'s
+`getOctokit` -- nothing here touches the local git checkout at all:
+
+1. **Validate.** Strips a leading `v` if present and runs the rest through `semver.parse()` (the
+   same dependency `get-version` uses, not a hand-rolled regex). An invalid version fails the
+   action immediately, before anything is created.
+2. **Check for collision.** Calls `GET /repos/{owner}/{repo}/git/refs/tags/{tag}`. A 404 means
+   the tag is free; anything else (including success) fails the action rather than silently
+   overwriting an existing release.
+3. **Stop here on a dry run.** `dry-run: true` ends the action at this point -- steps 1 and 2
+   already prove the version is valid and available, without creating anything.
+4. **Create the tag**, pointing at the commit the workflow is running against (`POST
+   /repos/{owner}/{repo}/git/refs`, `ref: refs/tags/<tag>`).
+5. **Publish the GitHub Release** for that tag (`POST /repos/{owner}/{repo}/releases`), with
+   `generate_release_notes: true` so the release body is built from merged PR titles since the
+   last tag, and `prerelease` set from whether the version has a `-` suffix.
+6. **Move the floating major tag**, unless `update-major-tag: false` was set or the version is a
+   prerelease (checked in step 1). If `vMAJOR` already exists, it's force-updated
+   (`PATCH .../git/refs/tags/vMAJOR`) to the new commit; if this is the first release in that
+   major line, it's created fresh the same way as step 4.
+
+Every one of these is a single, structured API call -- there's no shell string built from the
+version input anywhere, so the usual "caller-supplied text spliced into a `run:` script" class of
+risk doesn't apply here the way it would to a hand-rolled bash equivalent.
 
 ### Inputs
 
