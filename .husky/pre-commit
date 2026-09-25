@@ -19,9 +19,9 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Stage the updated dist folder
+# Stage the updated dist folders
 echo "✅ Build successful. Adding dist/ to commit..."
-git add dist/
+git add dist/ create-release/dist/
 
 echo "✅ All checks passed! Distribution is up-to-date!"
 exit 0

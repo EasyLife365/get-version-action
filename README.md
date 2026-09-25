@@ -225,6 +225,13 @@ If your repository uses tag protection rules or rulesets, ensure the identity be
 `github-token` is allowed to create and force-update tags. Otherwise the action fails when it
 tries to write them.
 
+**`update-major-tag` defaults to `true`.** Every non-prerelease call force-moves the floating
+major tag by default -- that's the point of a floating tag, but it means this is a default-on
+destructive, history-rewriting operation, not just an available one. Grant `github-token` only
+`contents: write` on the target repository (the minimum this action needs), never a broader
+credential, and set `update-major-tag: false` explicitly for any caller that wants to publish a
+version without moving what every other consumer of the major tag receives.
+
 ## 🛠️ Maintainer release runbook
 
 This repository releases itself using its own **Create Release** action (see above) -- one
