@@ -21,3 +21,5 @@ jobs:
     uses: EasyLife365/.github/.github/workflows/security_gate.yml@main
     with:
       full-history: ${{ inputs.full-history || false }}
+      node: true
+      node-package-manager: npm
